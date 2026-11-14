@@ -30,6 +30,8 @@ const COMMON_PARTS: CarProfile['parts'] = {
   dash: { tag: 'Innenraum', title: 'Armaturenbrett', text: 'Hier sind Tacho, Lüftung und Radio.', fact: 'Der Tacho zeigt, wie schnell das Auto gerade fährt.' },
   speedo: { tag: 'Innenraum', title: 'Tacho', text: 'Der Zeiger zeigt die Geschwindigkeit in km/h.', fact: 'Beim Fahren bewegt sich der Zeiger mit.' },
   seat: { tag: 'Innenraum', title: 'Sitz', text: 'Bequeme Sitze mit Gurt. Kinder sitzen hinten im Kindersitz.', fact: 'Der Gurt hält dich bei einer Vollbremsung sicher fest.' },
+  scan: { tag: 'Dein Modell', title: 'Aus deinen Fotos', text: 'Dieses 3D-Modell wurde aus Fotos von deinem Spielzeugauto berechnet. Es ist eine Hülle: Türen und Motorhaube lassen sich daran nicht öffnen.', fact: 'Je mehr Seiten auf den Fotos zu sehen sind, desto genauer wird das Modell.' },
+  interior: { tag: 'Innenraum', title: 'Rundumblick', text: 'Du sitzt auf dem Fahrersitz. Zieh mit dem Finger, um dich umzuschauen: nach vorne, zur Seite, nach hinten und nach oben.', fact: 'Dieses Bild hat eine KI gemalt. Es zeigt, wie es im Auto aussehen könnte.' },
   gear: { tag: 'Innenraum', title: 'Schalthebel', text: 'Mit dem Schalthebel wählt man den Gang: vorwärts, rückwärts oder parken.', fact: 'Viele Autos schalten heute von allein.' },
 }
 

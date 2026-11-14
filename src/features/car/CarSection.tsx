@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { CarScene, type CameraView } from './CarScene'
+import { CarScene, type CameraView, type CarSource } from './CarScene'
 import { InfoCard } from './InfoCard'
 import { CARS, PAINT_COLORS } from '../../data/cars'
 import type { PartInfo } from '../../data/types'
@@ -23,6 +23,9 @@ export function CarSection() {
   const [driving, setDriving] = useState(false)
   const [view, setView] = useState<CameraView>('outside')
   const [photo, setPhoto] = useState<{ url: string; label: string } | null>(null)
+  const [source, setSource] = useState<CarSource>({ kind: 'demo' })
+  const scanned = source.kind === 'glb'
+  const [panorama, setPanorama] = useState<string | undefined>(car.interiorPanorama)
 
   const onPick = useCallback((key: string | null) => {
     if (!key) { setSelected(null); setCard(car.summary); return }
@@ -40,9 +43,10 @@ export function CarSection() {
     if (!open && view === 'engine') setView('outside')
   }
   const toggleInside = () => {
-    if (view === 'inside') { setView('outside'); return }
+    if (view === 'inside') { setView('outside'); setCard(scanned ? car.parts.scan : car.summary); setSelected(null); return }
     if (driving) { setDriving(false); engineOff() }
-    setHoodOpen(false); setDoorsOpen(true); setView('inside'); onPick('steering')
+    setHoodOpen(false); if (!scanned) setDoorsOpen(true); setView('inside')
+    if (panorama) { setSelected(null); setCard(car.parts.interior) } else onPick('steering')
   }
   const toggleDrive = () => {
     const on = !driving
@@ -62,37 +66,59 @@ export function CarSection() {
     if (color) { setPaint(color); setCard(PHOTO_INFO); setSelected(null) }
   }
 
+  const onModel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setSource({ kind: 'glb', url: URL.createObjectURL(f) })
+    setHoodOpen(false); setDoorsOpen(false); setView('outside')
+    setSelected(null); setCard(car.parts.scan)
+  }
+
   return (
     <div className="section">
       <div className="section-head">
         <div>
           <h2 className="section-title">{car.name}</h2>
-          <div className="sub">Beispielauto · noch kein echtes Modell</div>
+          <div className="sub">{scanned ? 'Modell aus deinen Fotos' : 'Beispielauto · noch kein echtes Modell'}</div>
         </div>
+        <div className="uploads">
         <label className="upload" title="Foto vom Spielzeugauto: die Farbe wird übernommen">
           {photo && <img src={photo.url} alt="" />}
           <span>{photo ? photo.label : '📷 Foto vom Spielzeugauto'}</span>
           <input id="photo" type="file" accept="image/*" onChange={onPhoto} />
         </label>
+        <label className="upload" title="Fertiges 3D-Modell (.glb), z.B. aus einem Foto-zu-3D-Dienst">
+          <span>{scanned ? '✅ Eigenes 3D-Modell' : '📦 3D-Modell laden'}</span>
+          <input id="model" type="file" accept=".glb,model/gltf-binary" onChange={onModel} />
+        </label>
+        <label className="upload" title="360°-Bild vom Innenraum (am besten im Format 2:1)">
+          <span>{panorama ? '✅ Innenraum-Bild' : '🖼️ Innenraum-Bild'}</span>
+          <input id="pano" type="file" accept="image/*" onChange={e => {
+            const f = e.target.files?.[0]
+            if (f) { setPanorama(URL.createObjectURL(f)); setView('inside'); if (!scanned) setDoorsOpen(true); setSelected(null); setCard(car.parts.interior) }
+          }} />
+        </label>
+        </div>
       </div>
 
       <div className="stage">
-        <CarScene paint={paint} selected={selected} onPick={onPick} hoodOpen={hoodOpen} doorsOpen={doorsOpen} driving={driving} view={view} cardOpen={!!card} />
+        <CarScene paint={paint} selected={selected} onPick={onPick} hoodOpen={hoodOpen} doorsOpen={doorsOpen} driving={driving} view={view} cardOpen={!!card} source={source} panorama={panorama} />
         <div className="hint">Ziehen zum Drehen · Tippen auf ein Teil</div>
         {card && <InfoCard info={card} onClose={() => { setCard(null); setSelected(null) }} />}
       </div>
 
       <nav className="toolbar" aria-label="Aktionen">
-        <button className="btn" aria-pressed={hoodOpen} onClick={toggleHood}>🔧 Motorhaube</button>
-        <button className="btn" aria-pressed={doorsOpen} onClick={() => setDoorsOpen(!doorsOpen)}>🚪 Türen</button>
+        <button className="btn" aria-pressed={hoodOpen} onClick={toggleHood} disabled={scanned} title={scanned ? 'Geht bei Modellen aus Fotos nicht' : undefined}>🔧 Motorhaube</button>
+        <button className="btn" aria-pressed={doorsOpen} onClick={() => setDoorsOpen(!doorsOpen)} disabled={scanned} title={scanned ? 'Geht bei Modellen aus Fotos nicht' : undefined}>🚪 Türen</button>
         <button className="btn" aria-pressed={view === 'inside'} onClick={toggleInside}>🪑 Einsteigen</button>
         <button className="btn" aria-pressed={driving} onClick={toggleDrive}>🏁 Fahren</button>
-        <div className="swatches" role="group" aria-label="Farbe">
+        {scanned && <button className="btn" onClick={() => { setSource({ kind: 'demo' }); setCard(car.summary) }}>↩︎ Beispielauto</button>}
+        {!scanned && <div className="swatches" role="group" aria-label="Farbe">
           {PAINT_COLORS.map(c => (
             <button key={c.hex} className="swatch" title={c.name} aria-label={`Farbe ${c.name}`}
               aria-pressed={paint === c.hex} style={{ background: c.hex }} onClick={() => setPaint(c.hex)} />
           ))}
-        </div>
+        </div>}
       </nav>
     </div>
   )
