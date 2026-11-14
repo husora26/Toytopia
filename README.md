@@ -30,6 +30,11 @@ npm run build    # Produktionsbuild nach dist/
 | `src/lib/dominantColor.ts` | Kräftigste Farbe aus einem Foto lesen |
 | `src/lib/sound.ts` | Motorgeräusch und Hupe (WebAudio) |
 
+## Eigene 3D-Modelle und Innenraum
+
+- **📦 3D-Modell laden:** nimmt ein `.glb` (z.B. aus Meshy oder Tripo, aus Fotos vom Spielzeug erzeugt). Das Modell wird auf Autolänge skaliert und auf den Boden gestellt. Es ist eine geschlossene Hülle, deshalb sind Motorhaube und Türen dann aus.
+- **🖼️ Innenraum-Bild:** nimmt ein 360°-Rundumbild (am besten 2:1). „Einsteigen“ zeigt dann dieses Bild, und man schaut sich durch Ziehen um. Die Bildmitte ist „vorne“.
+
 ## Nächste Schritte
 
 1. Echtes, zerlegbares Automodell (GLB) einbauen. Die Knotennamen im Modell müssen den Schlüsseln in `cars.ts` entsprechen (`hood`, `door`, `engine`, ...).

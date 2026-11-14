@@ -18,4 +18,6 @@ export interface CarProfile {
   parts: Record<string, PartInfo>
   defaultColor: string
   modelUrl?: string
+  /** 360°-Rundumbild vom Innenraum (2:1), relativ zur App, z.B. `./panoramas/xyz.jpg` */
+  interiorPanorama?: string
 }

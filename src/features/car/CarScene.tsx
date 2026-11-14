@@ -1,12 +1,20 @@
-import { useEffect, useRef } from 'react'
+import { Suspense, useEffect, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { CarModel, type Motion } from './CarModel'
+import { ScannedCar } from './ScannedCar'
+import { PanoramaRoom } from './PanoramaRoom'
 import { engineRev } from '../../lib/sound'
 
 export type CameraView = 'outside' | 'engine' | 'inside'
+
+/** Woher das Auto kommt: Beispielauto aus Grundformen oder fertiges 3D-Modell (GLB) */
+export type CarSource = { kind: 'demo' } | { kind: 'glb'; url: string }
+
+/** Sitzposition des Fahrers im Auto (für Kamera und 360°-Innenraum) */
+const EYE = new THREE.Vector3(-0.25, 1.22, 0.4)
 
 const ROAD_R = 9.5
 const ROAD_Z = 9.5 // Mittelpunkt der Ringstraße; das Auto startet an ihrem Rand
@@ -15,7 +23,7 @@ const ROAD_Z = 9.5 // Mittelpunkt der Ringstraße; das Auto startet an ihrem Ran
 const VIEWS: Record<CameraView, [THREE.Vector3, THREE.Vector3, number]> = {
   outside: [new THREE.Vector3(6.5, 3.4, 6.5), new THREE.Vector3(0, 0.7, 0), 40],
   engine: [new THREE.Vector3(3.6, 2.9, 1.6), new THREE.Vector3(1.4, 0.7, 0), 40],
-  inside: [new THREE.Vector3(-0.25, 1.22, 0.4), new THREE.Vector3(1.6, 1.0, 0.4), 62],
+  inside: [EYE, new THREE.Vector3(1.6, 1.0, 0.4), 62],
 }
 
 function Ground() {
@@ -54,9 +62,12 @@ interface Props {
   view: CameraView
   /** Infokarte offen: auf schmalen Bildschirmen das Bild nach oben schieben, damit die Karte das Auto nicht verdeckt */
   cardOpen: boolean
+  source: CarSource
+  /** 360°-Bild vom Innenraum. Wenn gesetzt, zeigt "Einsteigen" dieses Bild statt der gebauten Teile. */
+  panorama?: string
 }
 
-function Rig({ driving, view, car, motion, cardOpen }: { driving: boolean; view: CameraView; car: React.RefObject<THREE.Group>; motion: Motion; cardOpen: boolean }) {
+function Rig({ driving, view, car, motion, cardOpen, pano }: { driving: boolean; view: CameraView; car: React.RefObject<THREE.Group>; motion: Motion; cardOpen: boolean; pano: boolean }) {
   const { camera, controls, size } = useThree() as unknown as { camera: THREE.PerspectiveCamera; controls: OrbitControlsImpl | null; size: { width: number; height: number } }
   const shift = useRef(0)
   const tween = useRef<{ t: number; fp: THREE.Vector3; tp: THREE.Vector3; ft: THREE.Vector3; tt: THREE.Vector3 } | null>(null)
@@ -65,18 +76,24 @@ function Rig({ driving, view, car, motion, cardOpen }: { driving: boolean; view:
   // Kamerafahrt, wenn die Ansicht wechselt
   useEffect(() => {
     if (!controls || !car.current) return
-    const [pos, target, fov] = VIEWS[view]
-    camera.fov = fov
+    const [pos, viewTarget, fov] = VIEWS[view]
+    const inPano = view === 'inside' && pano
+    // Im 360°-Bild dreht man sich auf der Stelle: Blickziel ganz nah vor dem Auge
+    const target = inPano ? pos.clone().add(new THREE.Vector3(0.01, 0, 0)) : viewTarget
+    camera.fov = inPano ? 70 : fov
     camera.updateProjectionMatrix()
-    controls.minDistance = view === 'inside' ? 0.01 : 2.5
-    controls.maxPolarAngle = view === 'inside' ? Math.PI * 0.75 : Math.PI * 0.49
+    controls.minDistance = view === 'inside' ? 0.005 : 2.5
+    controls.maxDistance = inPano ? 0.02 : 30
+    controls.enableZoom = !inPano
+    controls.rotateSpeed = inPano ? -0.4 : 1
+    controls.maxPolarAngle = view === 'inside' ? Math.PI * 0.85 : Math.PI * 0.49
     car.current.updateMatrixWorld()
     tween.current = {
       t: 0,
       fp: camera.position.clone(), tp: car.current.localToWorld(pos.clone()),
       ft: controls.target.clone(), tt: car.current.localToWorld(target.clone()),
     }
-  }, [view, controls, camera, car])
+  }, [view, controls, camera, car, pano])
 
   useFrame((_, dtRaw) => {
     const dt = Math.min(dtRaw, 0.05)
@@ -115,6 +132,7 @@ function Rig({ driving, view, car, motion, cardOpen }: { driving: boolean; view:
 }
 
 export function CarScene(p: Props) {
+  const inPano = p.view === 'inside' && !!p.panorama
   const car = useRef<THREE.Group>(null)
   const motion = useRef<Motion>({ speed: 0, wheelAngle: 0 }).current
   return (
@@ -133,12 +151,23 @@ export function CarScene(p: Props) {
         shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-24} shadow-camera-right={24} shadow-camera-top={30} shadow-camera-bottom={-24}
       />
-      <Ground />
-      <group ref={car}>
-        <CarModel paint={p.paint} selected={p.selected} onPick={p.onPick} hoodOpen={p.hoodOpen} doorsOpen={p.doorsOpen} motion={motion} />
+      <group visible={!inPano}><Ground /></group>
+      <group ref={car} visible={!inPano}>
+        {p.source.kind === 'glb' ? (
+          <Suspense fallback={null}>
+            <ScannedCar url={p.source.url} onPick={p.onPick} />
+          </Suspense>
+        ) : (
+          <CarModel paint={p.paint} selected={p.selected} onPick={p.onPick} hoodOpen={p.hoodOpen} doorsOpen={p.doorsOpen} motion={motion} />
+        )}
       </group>
+      {inPano && p.panorama && (
+        <Suspense fallback={null}>
+          <PanoramaRoom url={p.panorama} position={car.current ? car.current.localToWorld(EYE.clone()) : EYE} />
+        </Suspense>
+      )}
       <OrbitControls makeDefault enableDamping target={[0, 0.7, 0]} minDistance={2.5} maxDistance={30} maxPolarAngle={Math.PI * 0.49} />
-      <Rig driving={p.driving} view={p.view} car={car} motion={motion} cardOpen={p.cardOpen} />
+      <Rig driving={p.driving} view={p.view} car={car} motion={motion} cardOpen={p.cardOpen} pano={!!p.panorama} />
     </Canvas>
   )
 }
