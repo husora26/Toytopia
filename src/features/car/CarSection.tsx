@@ -5,6 +5,7 @@ import { CARS, PAINT_COLORS } from '../../data/cars'
 import type { PartInfo } from '../../data/types'
 import { dominantColor } from '../../lib/dominantColor'
 import { engineOff, engineOn, honk } from '../../lib/sound'
+import { photosTo3d } from '../../lib/photoTo3d'
 
 const PHOTO_INFO: PartInfo = {
   tag: 'Foto',
@@ -25,6 +26,7 @@ export function CarSection() {
   const [photo, setPhoto] = useState<{ url: string; label: string } | null>(null)
   const [source, setSource] = useState<CarSource>({ kind: 'demo' })
   const scanned = source.kind === 'glb'
+  const [building, setBuilding] = useState(false)
   const [panorama, setPanorama] = useState<string | undefined>(car.interiorPanorama)
 
   const onPick = useCallback((key: string | null) => {
@@ -74,6 +76,26 @@ export function CarSection() {
     setSelected(null); setCard(car.parts.scan)
   }
 
+  const onBuild = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = [...(e.target.files ?? [])]
+    e.target.value = ''
+    if (!files.length || building) return
+    setBuilding(true); setSelected(null)
+    const show = (text: string, fact = 'Das erste Foto sollte das Auto von vorne zeigen. Bis zu 4 Fotos werden benutzt.') =>
+      setCard({ tag: 'Wird gebaut', title: '3D-Modell aus Fotos', text, fact })
+    show(`${Math.min(files.length, 4)} Foto(s) werden hochgeladen …`)
+    try {
+      const url = await photosTo3d(files, p => show(`Meshy rechnet: ${p.progress} % fertig. Das dauert meist ein paar Minuten.`))
+      setSource({ kind: 'glb', url })
+      setHoodOpen(false); setDoorsOpen(false); setView('outside')
+      setCard(car.parts.scan)
+    } catch (err) {
+      setCard({ tag: 'Hat nicht geklappt', title: 'Kein 3D-Modell', text: String(err instanceof Error ? err.message : err), fact: 'Tipp: ruhiger Hintergrund, ganzes Auto im Bild, gutes Licht.' })
+    } finally {
+      setBuilding(false)
+    }
+  }
+
   return (
     <div className="section">
       <div className="section-head">
@@ -86,6 +108,10 @@ export function CarSection() {
           {photo && <img src={photo.url} alt="" />}
           <span>{photo ? photo.label : '📷 Foto vom Spielzeugauto'}</span>
           <input id="photo" type="file" accept="image/*" onChange={onPhoto} />
+        </label>
+        <label className="upload" title="1 bis 4 Fotos vom Spielzeugauto, zuerst von vorne">
+          <span>{building ? '⏳ Wird gebaut …' : '🪄 3D aus Fotos'}</span>
+          <input id="build" type="file" accept="image/*" multiple disabled={building} onChange={onBuild} />
         </label>
         <label className="upload" title="Fertiges 3D-Modell (.glb), z.B. aus einem Foto-zu-3D-Dienst">
           <span>{scanned ? '✅ Eigenes 3D-Modell' : '📦 3D-Modell laden'}</span>
