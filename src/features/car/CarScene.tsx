@@ -52,10 +52,13 @@ interface Props {
   doorsOpen: boolean
   driving: boolean
   view: CameraView
+  /** Infokarte offen: auf schmalen Bildschirmen das Bild nach oben schieben, damit die Karte das Auto nicht verdeckt */
+  cardOpen: boolean
 }
 
-function Rig({ driving, view, car, motion }: { driving: boolean; view: CameraView; car: React.RefObject<THREE.Group>; motion: Motion }) {
-  const { camera, controls } = useThree() as unknown as { camera: THREE.PerspectiveCamera; controls: OrbitControlsImpl | null }
+function Rig({ driving, view, car, motion, cardOpen }: { driving: boolean; view: CameraView; car: React.RefObject<THREE.Group>; motion: Motion; cardOpen: boolean }) {
+  const { camera, controls, size } = useThree() as unknown as { camera: THREE.PerspectiveCamera; controls: OrbitControlsImpl | null; size: { width: number; height: number } }
+  const shift = useRef(0)
   const tween = useRef<{ t: number; fp: THREE.Vector3; tp: THREE.Vector3; ft: THREE.Vector3; tt: THREE.Vector3 } | null>(null)
   const state = useRef({ angle: 0, last: new THREE.Vector3() })
 
@@ -77,6 +80,13 @@ function Rig({ driving, view, car, motion }: { driving: boolean; view: CameraVie
 
   useFrame((_, dtRaw) => {
     const dt = Math.min(dtRaw, 0.05)
+    // Bildausschnitt sanft verschieben (nur schmale Bildschirme, nicht im Innenraum)
+    const want = cardOpen && size.width < 640 && view !== 'inside' ? 0.2 : 0
+    if (Math.abs(want - shift.current) > 0.001) {
+      shift.current += (want - shift.current) * Math.min(1, dt * 6)
+      if (shift.current < 0.002 && want === 0) { shift.current = 0; camera.clearViewOffset() }
+      else camera.setViewOffset(size.width, size.height, 0, size.height * shift.current, size.width, size.height)
+    }
     const g = car.current
     if (!g || !controls) return
     const s = state.current
@@ -128,7 +138,7 @@ export function CarScene(p: Props) {
         <CarModel paint={p.paint} selected={p.selected} onPick={p.onPick} hoodOpen={p.hoodOpen} doorsOpen={p.doorsOpen} motion={motion} />
       </group>
       <OrbitControls makeDefault enableDamping target={[0, 0.7, 0]} minDistance={2.5} maxDistance={30} maxPolarAngle={Math.PI * 0.49} />
-      <Rig driving={p.driving} view={p.view} car={car} motion={motion} />
+      <Rig driving={p.driving} view={p.view} car={car} motion={motion} cardOpen={p.cardOpen} />
     </Canvas>
   )
 }

@@ -77,7 +77,7 @@ export function CarSection() {
       </div>
 
       <div className="stage">
-        <CarScene paint={paint} selected={selected} onPick={onPick} hoodOpen={hoodOpen} doorsOpen={doorsOpen} driving={driving} view={view} />
+        <CarScene paint={paint} selected={selected} onPick={onPick} hoodOpen={hoodOpen} doorsOpen={doorsOpen} driving={driving} view={view} cardOpen={!!card} />
         <div className="hint">Ziehen zum Drehen · Tippen auf ein Teil</div>
         {card && <InfoCard info={card} onClose={() => { setCard(null); setSelected(null) }} />}
       </div>
